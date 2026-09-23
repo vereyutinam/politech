@@ -1,0 +1,28 @@
+package lab1;
+
+public class Plant extends Agent {
+
+    public Plant(Environment env, int x, int y) {
+        super(env, x, y, Config.PLANT_CHILD_ENERGY, "🌱");
+    }
+
+    @Override
+    protected Agent createChild(int childX, int childY, int childEnergy) {
+        Plant child = new Plant(env, childX, childY);
+        child.setEnergy(childEnergy);
+        return child;
+    }
+
+    @Override
+    public void step() {
+        energy += Config.PLANT_PHOTOSYNTHESIS;
+
+        if (energy > Config.PLANT_REPRO_THRESHOLD) {
+            reproduce(Config.PLANT_CHILD_ENERGY);
+        }
+
+        if (getEnergy() >= Config.PLANT_MAX_ENERGY) {
+            env.setAgent(x, y, null);
+        }
+    }
+}
