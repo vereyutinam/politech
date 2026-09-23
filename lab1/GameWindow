@@ -1,0 +1,143 @@
+package lab1;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.List;
+import java.util.ArrayList;
+
+public class GameWindow extends JFrame {
+
+    private Environment env;
+    private int width, height;
+
+    private WorldPanel worldPanel;
+    private Timer timer;
+    private JLabel statsLabel;
+    private JLabel stepLabel;        // ← НОВОЕ
+    private JSlider speedSlider;
+
+    private boolean running = false;
+    private int stepCount = 0;       // ← НОВОЕ
+
+    public GameWindow(Environment env, int width, int height) {
+        this.env = env;
+        this.width = width;
+        this.height = height;
+
+        setTitle("Искусственная жизнь");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        // === Центральная часть ===
+        JPanel centerWrapper = new JPanel(new GridBagLayout());
+        centerWrapper.setBackground(Color.DARK_GRAY);
+
+        worldPanel = new WorldPanel(env, width, height);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.CENTER;
+        centerWrapper.add(worldPanel, gbc);
+
+        add(centerWrapper, BorderLayout.CENTER);
+
+        // === Панель управления ===
+        JPanel controlPanel = new JPanel(new FlowLayout());
+
+        JButton startBtn = new JButton("Старт");
+        JButton pauseBtn = new JButton("Пауза");
+        JButton stepBtn  = new JButton("Шаг");
+        JButton resetBtn = new JButton("Сброс");
+
+        speedSlider = new JSlider(10, 500, 100);
+        speedSlider.setPreferredSize(new Dimension(150, 30));
+
+        stepLabel  = new JLabel("Шаг: 0");                        // ← НОВОЕ
+        statsLabel = new JLabel("Растения: 0  Травоядные: 0  Хищники: 0");
+
+        controlPanel.add(startBtn);
+        controlPanel.add(pauseBtn);
+        controlPanel.add(stepBtn);
+        controlPanel.add(resetBtn);
+        controlPanel.add(new JLabel("Скорость:"));
+        controlPanel.add(speedSlider);
+        controlPanel.add(stepLabel);                              // ← НОВОЕ
+        controlPanel.add(statsLabel);
+
+        add(controlPanel, BorderLayout.SOUTH);
+
+        // === Таймер ===
+        timer = new Timer(speedSlider.getValue(), e -> doStep());
+
+        // === Кнопки ===
+        startBtn.addActionListener(e -> {
+            running = true;
+            timer.start();
+        });
+
+        pauseBtn.addActionListener(e -> {
+            running = false;
+            timer.stop();
+        });
+
+        stepBtn.addActionListener(e -> {
+            if (!running) doStep();
+        });
+
+        resetBtn.addActionListener(e -> {
+            stepCount = 0;                                        // ← сброс шага
+            updateStats();
+            worldPanel.refresh();
+        });
+
+        speedSlider.addChangeListener(e -> {
+            timer.setDelay(speedSlider.getValue());
+        });
+
+        updateStats();
+        worldPanel.refresh();
+
+        setSize(800, 800);
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+
+    private void doStep() {
+        List<Agent> agents = collectAgents();
+        for (Agent a : agents) {
+            if (env.getAgent(a.getX(), a.getY()) == a) {
+                a.step();
+            }
+        }
+        stepCount++;                                              // ← шаг +1
+        updateStats();
+        worldPanel.refresh();
+    }
+
+    private List<Agent> collectAgents() {
+        List<Agent> agents = new ArrayList<>();
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                Agent a = env.getAgent(x, y);
+                if (a != null) agents.add(a);
+            }
+        }
+        return agents;
+    }
+
+    private void updateStats() {
+        int p = 0, h = 0, x = 0;
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                Agent a = env.getAgent(i, j);
+                if (a instanceof Plant) p++;
+                else if (a instanceof Herbivore) h++;
+                else if (a instanceof Predator) x++;
+            }
+        }
+
+        stepLabel.setText("Шаг: " + stepCount);                     // ← обновляем шаг
+        statsLabel.setText(String.format("Растения: %d  Травоядные: %d  Хищники: %d", p, h, x));
+    }
+}
