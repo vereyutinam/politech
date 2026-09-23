@@ -1,0 +1,82 @@
+package lab1;
+
+public class Herbivore extends Agent {
+    int metabolism;
+    int foodEnergy;
+    int reproThreshold;
+    int childEnergy;
+    int visionRadius;
+
+    public Herbivore(Environment env, int x, int y) {
+        super(env, x, y, Config.HERBIVORE_CHILD_ENERGY, "🐇");
+        this.metabolism     = Config.HERBIVORE_METABOLISM;
+        this.foodEnergy     = Config.HERBIVORE_FOOD_ENERGY;
+        this.reproThreshold = Config.HERBIVORE_REPRO_THRESHOLD;
+        this.childEnergy    = Config.HERBIVORE_CHILD_ENERGY;
+        this.visionRadius   = Config.VISION_RADIUS;
+    }
+
+
+    @Override
+    protected Agent createChild(int childX, int childY, int childEnergy) {
+        Herbivore child = new Herbivore(env, childX, childY);
+        child.setEnergy(childEnergy);
+        return child;
+    }
+
+    @Override
+    public void step() {
+        energy -= metabolism;
+        if (checkDeath()) return;
+
+
+        Agent predator = env.findNearest(x, y, visionRadius, Predator.class);
+        Agent plant    = env.findNearest(x, y, visionRadius, Plant.class);
+
+        if (predator != null) {
+            int dx = Math.abs(x - predator.getX());
+            int dy = Math.abs(y - predator.getY());
+            int dirX = Integer.signum(x - predator.getX());
+            int dirY = Integer.signum(y - predator.getY());
+
+            if (dx >= dy) {
+                if (env.getAgent(x + dirX, y) instanceof Plant) {
+                    env.setAgent(x + dirX, y, null);
+                    energy += foodEnergy;
+                }
+                move(dirX, 0);
+            } else {
+                if (env.getAgent(x, y + dirY) instanceof Plant) {
+                    env.setAgent(x, y + dirY, null);
+                    energy += foodEnergy;
+                }
+                move(0, dirY);
+            }
+
+        } else if (plant != null) {
+            int dist = Math.abs(plant.getX() - x) + Math.abs(plant.getY() - y);
+            if (dist == 1) {
+                env.setAgent(plant.getX(), plant.getY(), null);
+                energy += foodEnergy;
+                move(plant.getX() - x, plant.getY() - y);
+            } else {
+                int dx = Math.abs(plant.getX() - x);
+                int dy = Math.abs(plant.getY() - y);
+                int dirX = Integer.signum(plant.getX() - x);
+                int dirY = Integer.signum(plant.getY() - y);
+                if (dx >= dy) move(dirX, 0);
+                else move(0, dirY);
+            }
+
+        } else {
+            int dx = (int)(Math.random() * 3) - 1;
+            int dy = (int)(Math.random() * 3) - 1;
+            if (dx != 0) move(dx, 0);
+            else if (dy != 0) move(0, dy);
+        }
+
+        if (energy > reproThreshold) {
+            reproduce(childEnergy);
+        }
+    }
+}
