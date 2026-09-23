@@ -1,0 +1,23 @@
+package lab1;
+
+public class Config {
+
+    //PLANT
+    public static int PLANT_PHOTOSYNTHESIS = 9;
+    public static int PLANT_REPRO_THRESHOLD = 38;        // чем больше, тем медленнее размножаются
+    public static int PLANT_CHILD_ENERGY = 13;
+    public static int PLANT_MAX_ENERGY = 425;//
+
+    //HERBIVORE
+    public static int HERBIVORE_METABOLISM = 2;
+    public static int HERBIVORE_FOOD_ENERGY = 26;
+    public static int HERBIVORE_REPRO_THRESHOLD = 63;     //
+    public static int HERBIVORE_CHILD_ENERGY = 14;           // чем больше, тем дольше живут
+
+    //PREDATOR
+    public static int PREDATOR_METABOLISM = 2;
+    public static int PREDATOR_FOOD_ENERGY = 19;
+    public static int PREDATOR_REPRO_THRESHOLD = 122;        //
+    public static int PREDATOR_CHILD_ENERGY = 53;            // чем больше, тем дольше живут
+    public static final int VISION_RADIUS = 2;
+}
