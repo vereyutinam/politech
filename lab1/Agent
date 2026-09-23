@@ -1,0 +1,62 @@
+package lab1;
+
+public abstract class Agent{
+    protected Environment env;
+    protected int x, y, energy;
+    protected String symbol;
+
+    public Agent(Environment env, int x, int y, int energy, String symbol){
+        this.env = env;
+        this.x = x;
+        this.y = y;
+        this.energy = energy;
+        this.symbol = symbol;
+    }
+
+    public abstract void step();
+    protected abstract Agent createChild(int childX, int childY, int childEnergy);
+
+    protected void reproduce(int childEnergy) {
+        int[][] dirs = {{0,1}, {0,-1}, {1,0}, {-1,0}};
+        for (int[] d : dirs) {
+            int nx = x + d[0];
+            int ny = y + d[1];
+            if (env.isValidCoordinate(nx, ny) && env.getAgent(nx, ny) == null) {
+                this.energy -= childEnergy;
+                Agent child = createChild(nx, ny, childEnergy);
+                env.setAgent(nx, ny, child);
+                return;
+            }
+        }
+    }
+
+    protected void move(int dx, int dy) {
+        int nx = x + dx;
+        int ny = y + dy;
+
+        if (env.isValidCoordinate(nx, ny) && ((env.getAgent(nx, ny) == null) ) ) {
+            env.setAgent(x, y, null);
+            this.x = nx;
+            this.y = ny;
+            env.setAgent(nx, ny, this);
+        }
+    }
+
+    protected boolean checkDeath() {
+        if (energy <= 0) {
+            env.setAgent(x, y, null);
+            return true;
+        }
+        return false;
+    }
+
+
+
+    public int getX() { return x; }
+    public int getY() { return y; }
+    public int getEnergy() { return energy; }
+    public String getSymbol() { return symbol; }
+
+    public void setEnergy(int energy) { this.energy = energy; }
+    public void addEnergy(int amount) { this.energy += amount; }
+}
