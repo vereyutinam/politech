@@ -1,0 +1,70 @@
+package lab1;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Environment {
+    private Agent[][] matrix;
+    public static int radius = 5;
+    private int m;
+    private int n;
+
+    public Environment(int m, int n){
+        this.m = m;
+        this.n = n;
+        matrix = new Agent[m][n];
+    }
+
+    public boolean isValidCoordinate(int x, int y) {
+        return x >= 0 && x < m && y >= 0 && y < n;
+    }
+
+
+    public Agent getAgent(int x, int y){
+        if (isValidCoordinate(x, y)) {
+            return matrix[x][y];
+        }
+        return null;
+    }
+
+    public void setAgent(int x, int y, Agent agent){
+        if (isValidCoordinate(x, y)) {
+            matrix[x][y] = agent;
+        }
+    }
+
+    public List<Agent> getNeighbors(int x, int y, int radius) {
+        List<Agent> neighbors = new ArrayList<>();
+
+        for (int i = x - radius; i <= x + radius; i++) {
+            for (int j = y - radius; j <= y + radius; j++) {
+                if (i == x && j == y) continue;
+
+                if (isValidCoordinate(i, j)) {
+                    Agent agent = matrix[i][j];
+                    if (agent != null) {
+                        neighbors.add(agent);
+                    }
+                }
+            }
+        }
+        return neighbors;
+    }
+
+    public Agent findNearest(int startX, int startY, int radius, Class<?> targetType) {
+        Agent nearest = null;
+        int minDistance = Integer.MAX_VALUE;
+
+        List<Agent> neighbors = getNeighbors(startX, startY, radius);
+
+        for (Agent a : neighbors) {
+            if (targetType.isInstance(a)) {
+                int dist = Math.abs(a.getX() - startX) + Math.abs(a.getY() - startY);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearest = a;
+                }
+            }
+        }
+        return nearest;
+    }
+}
