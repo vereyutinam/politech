@@ -1,0 +1,63 @@
+package lab1;
+
+public class Predator extends Agent {
+
+    int metabolism;
+    int foodEnergy;
+    int reproThreshold;
+    int childEnergy;
+    int visionRadius;
+
+    public Predator(Environment env, int x, int y) {
+        super(env, x, y, Config.PREDATOR_CHILD_ENERGY, "🐺");
+        this.metabolism     = Config.PREDATOR_METABOLISM;
+        this.foodEnergy     = Config.PREDATOR_FOOD_ENERGY;
+        this.reproThreshold = Config.PREDATOR_REPRO_THRESHOLD;
+        this.childEnergy    = Config.PREDATOR_CHILD_ENERGY;
+        this.visionRadius   = Config.VISION_RADIUS;
+    }
+
+    @Override
+    protected Agent createChild(int childX, int childY, int childEnergy) {
+        Predator child = new Predator(env, childX, childY);
+        child.setEnergy(childEnergy);
+        return child;
+    }
+
+    @Override
+    public void step() {
+        energy -= metabolism;
+        if (checkDeath()) return;
+
+        Agent herbivore = env.findNearest(x, y, visionRadius, Herbivore.class);
+
+        if (herbivore != null) {
+            int dist = Math.abs(herbivore.getX() - x) + Math.abs(herbivore.getY() - y);
+            if (dist == 1) {
+                env.setAgent(herbivore.getX(), herbivore.getY(), null);
+                energy += foodEnergy;
+                move(herbivore.getX() - x, herbivore.getY() - y);
+            } else {
+                int dx = Math.abs(herbivore.getX() - x);
+                int dy = Math.abs(herbivore.getY() - y);
+                int dirX = Integer.signum(herbivore.getX() - x);
+                int dirY = Integer.signum(herbivore.getY() - y);
+
+                if (dx >= dy && !(env.getAgent(x + dirX, y) instanceof Plant)) {
+                    move(dirX, 0);
+                } else if (dy != 0 && !(env.getAgent(x, y + dirY) instanceof Plant)) {
+                    move(0, dirY);
+                }
+            }
+        } else {
+            int dx = (int)(Math.random() * 3) - 1;
+            int dy = (int)(Math.random() * 3) - 1;
+            if (dx != 0 && !(env.getAgent(x + dx, y) instanceof Plant)) move(dx, 0);
+            else if (dy != 0) move(0, dy);
+        }
+
+        if (energy > reproThreshold) {
+            reproduce(childEnergy);
+        }
+    }
+}
