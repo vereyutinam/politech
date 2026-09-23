@@ -1,0 +1,99 @@
+package lab1;
+
+import javax.swing.SwingUtilities;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Scanner;
+
+public class Solution {
+    private static int width = 50;
+    private static int height = 50;
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.println("Выберите режим:");
+        System.out.println("  1 — консольный");
+        System.out.println("  2 — оконный");
+        System.out.print("Выбор: ");
+
+        int mode = scanner.nextInt();
+        scanner.nextLine();
+
+        // Создаём мир и заселяем — ОБЩЕЕ для обоих режимов
+        Environment env = new Environment(width, height);
+        spawnRandom(env, 300, Plant.class);
+        spawnRandom(env, 60, Herbivore.class);
+        spawnRandom(env, 20, Predator.class);
+
+        if (mode == 2) {
+            // ОКОННЫЙ РЕЖИМ
+            scanner.close();
+            SwingUtilities.invokeLater(() -> new GameWindow(env, width, height));
+        } else {
+            // КОНСОЛЬНЫЙ РЕЖИМ
+            scanner.close();
+            runConsole(env);
+        }
+    }
+
+    // ================= КОНСОЛЬНЫЙ РЕЖИМ =================
+    private static void runConsole(Environment env) {
+        for (int step = 0; step <= 10000; step++) {
+            System.out.print("\033[H");
+            System.out.flush();
+            System.out.println("=== Шаг " + step + " ===");
+            printWorld(env);
+
+            List<Agent> agents = collectAgents(env);
+            for (Agent a : agents) {
+                if (env.getAgent(a.getX(), a.getY()) == a) {
+                    a.step();
+                }
+            }
+            try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+        }
+    }
+
+    private static void printWorld(Environment env) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                Agent a = env.getAgent(x, y);
+                System.out.print((a == null ? ".." : a.getSymbol()) + " ");
+            }
+            System.out.println();
+        }
+    }
+
+    private static List<Agent> collectAgents(Environment env) {
+        List<Agent> agents = new ArrayList<>();
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                Agent a = env.getAgent(x, y);
+                if (a != null) agents.add(a);
+            }
+        }
+        return agents;
+    }
+
+    // ================= ОБЩЕЕ: ЗАСЕЛЕНИЕ =================
+    public static void spawnRandom(Environment env, int count, Class<?> type) {
+        int attempts = 0;
+        int maxAttempts = count * 100;
+        for (int i = 0; i < count && attempts < maxAttempts; ) {
+            attempts++;
+            int x = (int) (Math.random() * width);
+            int y = (int) (Math.random() * height);
+
+            if (env.getAgent(x, y) != null) continue;
+            i++;
+
+            Agent agent = null;
+            if (type == Plant.class)          agent = new Plant(env, x, y);
+            else if (type == Herbivore.class) agent = new Herbivore(env, x, y);
+            else if (type == Predator.class)  agent = new Predator(env, x, y);
+
+            if (agent != null) env.setAgent(x, y, agent);
+        }
+    }
+}
