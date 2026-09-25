@@ -30,10 +30,12 @@ public class Herbivore extends Agent {
         if (checkDeath()) return;
 
 
-        Agent predator = env.findNearest(x, y, visionRadius, Predator.class);
-        Agent plant    = env.findNearest(x, y, visionRadius, Plant.class);
+        Agent predator = env.findNearest(x, y, 3, Predator.class);
+        Agent plant    = env.findNearest(x, y, 3, Plant.class);
 
         if (predator != null) {
+            int oldX = x;
+            int oldY = y;
             int dx = Math.abs(x - predator.getX());
             int dy = Math.abs(y - predator.getY());
             int dirX = Integer.signum(x - predator.getX());
@@ -45,6 +47,13 @@ public class Herbivore extends Agent {
                     energy += foodEnergy;
                 }
                 move(dirX, 0);
+                if (x == oldX && y == oldY){
+                    if (env.getAgent(x, y + dirY) instanceof Plant) {
+                        env.setAgent(x, y + dirY, null);
+                        energy += foodEnergy;
+                    }
+                    move(0, dirY);
+                }
             } else {
                 if (env.getAgent(x, y + dirY) instanceof Plant) {
                     env.setAgent(x, y + dirY, null);
