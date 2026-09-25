@@ -1,23 +1,91 @@
 package lab1;
 
 public class Config {
-
+    //баланс
     //PLANT
-    public static int PLANT_PHOTOSYNTHESIS = 9;
-    public static int PLANT_REPRO_THRESHOLD = 38;        // чем больше, тем медленнее размножаются
+    public static int PLANT_PHOTOSYNTHESIS = 5;
+    public static int PLANT_REPRO_THRESHOLD = 16;        // чем больше, тем медленнее размножаются
     public static int PLANT_CHILD_ENERGY = 13;
-    public static int PLANT_MAX_ENERGY = 425;//
+    public static int PLANT_MAX_ENERGY = 366;//
 
     //HERBIVORE
-    public static int HERBIVORE_METABOLISM = 2;
-    public static int HERBIVORE_FOOD_ENERGY = 26;
-    public static int HERBIVORE_REPRO_THRESHOLD = 63;     //
-    public static int HERBIVORE_CHILD_ENERGY = 14;           // чем больше, тем дольше живут
+    public static int HERBIVORE_METABOLISM = 1;
+    public static int HERBIVORE_FOOD_ENERGY = 27;
+    public static int HERBIVORE_REPRO_THRESHOLD = 36;     //
+    public static int HERBIVORE_CHILD_ENERGY = 28;           // чем больше, тем дольше живут
 
     //PREDATOR
-    public static int PREDATOR_METABOLISM = 2;
-    public static int PREDATOR_FOOD_ENERGY = 19;
-    public static int PREDATOR_REPRO_THRESHOLD = 122;        //
-    public static int PREDATOR_CHILD_ENERGY = 53;            // чем больше, тем дольше живут
-    public static final int VISION_RADIUS = 2;
+    public static int PREDATOR_METABOLISM = 4;
+    public static int PREDATOR_FOOD_ENERGY = 10;
+    public static int PREDATOR_REPRO_THRESHOLD = 41;        //
+    public static int PREDATOR_CHILD_ENERGY = 24;
+
+
+    public static final int VISION_RADIUS = 3;
+
+
+
+    //зайцы
+    //PLANT
+/*    public static int PLANT_PHOTOSYNTHESIS = 10;
+    public static int PLANT_REPRO_THRESHOLD = 5;        // чем больше, тем медленнее размножаются
+    public static int PLANT_CHILD_ENERGY = 10;
+    public static int PLANT_MAX_ENERGY = 500;//
+
+    //HERBIVORE
+    public static int HERBIVORE_METABOLISM = 1;
+    public static int HERBIVORE_FOOD_ENERGY = 2;
+    public static int HERBIVORE_REPRO_THRESHOLD = 100;     //
+    public static int HERBIVORE_CHILD_ENERGY = 5;           // чем больше, тем дольше живут
+
+    //PREDATOR
+    public static int PREDATOR_METABOLISM = 1;
+    public static int PREDATOR_FOOD_ENERGY = 5;
+    public static int PREDATOR_REPRO_THRESHOLD = 200;        //
+    public static int PREDATOR_CHILD_ENERGY = 5;            // чем больше, тем дольше живут
+    public static final int VISION_RADIUS = 3;*/
+
+
+
+    //трава
+    //PLANT
+/*  public static int PLANT_PHOTOSYNTHESIS = 1;
+    public static int PLANT_REPRO_THRESHOLD = 20;        // чем больше, тем медленнее размножаются
+    public static int PLANT_CHILD_ENERGY = 7;
+    public static int PLANT_MAX_ENERGY = 500;//
+
+    //HERBIVORE
+    public static int HERBIVORE_METABOLISM = 3;
+    public static int HERBIVORE_FOOD_ENERGY = 3;
+    public static int HERBIVORE_REPRO_THRESHOLD = 100;     //
+    public static int HERBIVORE_CHILD_ENERGY = 5;           // чем больше, тем дольше живут
+
+    //PREDATOR
+    public static int PREDATOR_METABOLISM = 1;
+    public static int PREDATOR_FOOD_ENERGY = 6;
+    public static int PREDATOR_REPRO_THRESHOLD = 100;        //
+    public static int PREDATOR_CHILD_ENERGY = 10;            // чем больше, тем дольше живут
+    public static final int VISION_RADIUS = 3;*/
+
+
+
+    //волки
+    //PLANT
+/*    public static int PLANT_PHOTOSYNTHESIS = 1;
+    public static int PLANT_REPRO_THRESHOLD = 70;        // чем больше, тем медленнее размножаются
+    public static int PLANT_CHILD_ENERGY = 1;
+    public static int PLANT_MAX_ENERGY = 100;//
+
+    //HERBIVORE
+    public static int HERBIVORE_METABOLISM = 1;
+    public static int HERBIVORE_FOOD_ENERGY = 50;
+    public static int HERBIVORE_REPRO_THRESHOLD = 11;     //
+    public static int HERBIVORE_CHILD_ENERGY = 10;           // чем больше, тем дольше живут
+
+    //PREDATOR
+    public static int PREDATOR_METABOLISM = 1;
+    public static int PREDATOR_FOOD_ENERGY = 15;
+    public static int PREDATOR_REPRO_THRESHOLD = 100;        //
+    public static int PREDATOR_CHILD_ENERGY = 50;            // чем больше, тем дольше живут
+    public static final int VISION_RADIUS = 3;*/
 }
