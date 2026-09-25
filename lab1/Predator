@@ -10,11 +10,7 @@ public class Predator extends Agent {
 
     public Predator(Environment env, int x, int y) {
         super(env, x, y, Config.PREDATOR_CHILD_ENERGY, "🐺");
-        this.metabolism     = Config.PREDATOR_METABOLISM;
-        this.foodEnergy     = Config.PREDATOR_FOOD_ENERGY;
-        this.reproThreshold = Config.PREDATOR_REPRO_THRESHOLD;
-        this.childEnergy    = Config.PREDATOR_CHILD_ENERGY;
-        this.visionRadius   = Config.VISION_RADIUS;
+
     }
 
     @Override
@@ -26,6 +22,11 @@ public class Predator extends Agent {
 
     @Override
     public void step() {
+        this.metabolism     = Config.PREDATOR_METABOLISM;
+        this.foodEnergy     = Config.PREDATOR_FOOD_ENERGY;
+        this.reproThreshold = Config.PREDATOR_REPRO_THRESHOLD;
+        this.childEnergy    = Config.PREDATOR_CHILD_ENERGY;
+        this.visionRadius   = Config.VISION_RADIUS;
         energy -= metabolism;
         if (checkDeath()) return;
 
