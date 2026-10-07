@@ -1,0 +1,221 @@
+package lab2;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.Random;
+
+public class Maze {
+
+    private static final double WATER_DENSITY = 0.1;
+    private static final double TRAP_DENSITY  = 0.08;
+    private static final double LOOP_DENSITY  = 0.1;
+
+    private final Random random = new Random();
+    private final int width;
+    private final int height;
+    private final Cell[][] grid;
+
+    private final List<int[]> initialWater = new ArrayList<>();
+    private final List<int[]> initialTraps = new ArrayList<>();
+    private int cheeseX, cheeseY;
+
+    public Maze(int width, int height) {
+        this.width = width;
+        this.height = height;
+        this.grid = new Cell[width][height];
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                grid[x][y] = new Cell(x, y);
+            }
+        }
+    }
+
+    public void generate() {
+        // Сброс visited
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                grid[x][y].setVisited(false);
+            }
+        }
+
+        Deque<Cell> stack = new ArrayDeque<>();
+        Cell start = grid[0][0];
+        start.setVisited(true);
+        stack.push(start);
+
+        while (!stack.isEmpty()) {
+            Cell current = stack.peek();
+            ArrayList<Cell> neighbors = getUnvisitedNeighbors(current);
+
+            if (neighbors.isEmpty()) {
+                stack.pop();
+            } else {
+                Cell next = neighbors.get(random.nextInt(neighbors.size()));
+                carvePassage(current, next);
+                next.setVisited(true);
+                stack.push(next);
+            }
+        }
+
+        addLoops();
+
+        // Вход и выход
+        grid[0][0].removeWall(Cell.WEST);
+        grid[width - 1][height - 1].removeWall(Cell.EAST);
+    }
+
+    /** Убирает несколько случайных внутренних стен, чтобы появились альтернативные пути. */
+    private void addLoops() {
+        int toRemove = (int) (LOOP_DENSITY * width * height);
+        int attempts = toRemove * 50;
+        while (toRemove > 0 && attempts-- > 0) {
+            int x = random.nextInt(width);
+            int y = random.nextInt(height);
+            if (random.nextBoolean()) {
+                if (x + 1 < width && grid[x][y].hasWall(Cell.EAST)) {
+                    carvePassage(grid[x][y], grid[x + 1][y]);
+                    toRemove--;
+                }
+            } else {
+                if (y + 1 < height && grid[x][y].hasWall(Cell.SOUTH)) {
+                    carvePassage(grid[x][y], grid[x][y + 1]);
+                    toRemove--;
+                }
+            }
+        }
+    }
+
+    private ArrayList<Cell> getUnvisitedNeighbors(Cell cell) {
+        ArrayList<Cell> result = new ArrayList<>();
+        int x = cell.getX();
+        int y = cell.getY();
+
+        if (y - 1 >= 0 && !grid[x][y - 1].isVisited()) result.add(grid[x][y - 1]);
+        if (x + 1 < width && !grid[x + 1][y].isVisited()) result.add(grid[x + 1][y]);
+        if (y + 1 < height && !grid[x][y + 1].isVisited()) result.add(grid[x][y + 1]);
+        if (x - 1 >= 0 && !grid[x - 1][y].isVisited()) result.add(grid[x - 1][y]);
+
+        return result;
+    }
+
+    private void carvePassage(Cell current, Cell next) {
+        int dx = next.getX() - current.getX();
+        int dy = next.getY() - current.getY();
+
+        if (dx == 1) {
+            current.removeWall(Cell.EAST);
+            next.removeWall(Cell.WEST);
+        } else if (dx == -1) {
+            current.removeWall(Cell.WEST);
+            next.removeWall(Cell.EAST);
+        } else if (dy == 1) {
+            current.removeWall(Cell.SOUTH);
+            next.removeWall(Cell.NORTH);
+        } else if (dy == -1) {
+            current.removeWall(Cell.NORTH);
+            next.removeWall(Cell.SOUTH);
+        }
+    }
+
+    public void replaceReward() {
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                grid[x][y].setType(CellType.EMPTY);
+
+        cheeseX = width - 1;
+        cheeseY = height - 1;
+        grid[cheeseX][cheeseY].setType(CellType.CHEESE);
+
+        initialWater.clear();
+        initialTraps.clear();
+
+        int nWater = Math.max(1, (int)(WATER_DENSITY * width * height));
+        int nTrap  = Math.max(1, (int)(TRAP_DENSITY  * width * height));
+
+        placeAndRemember(CellType.WATER, nWater, initialWater);
+        placeAndRemember(CellType.TRAP,  nTrap,  initialTraps);
+    }
+
+    private void placeAndRemember(CellType type, int number, List<int[]> list) {
+        int placed = 0;
+        int attempts = 0;
+        int maxAttempts = number * 100;
+
+        while (placed < number && attempts < maxAttempts) {
+            int x = random.nextInt(width);
+            int y = random.nextInt(height);
+            attempts++;
+
+            if (grid[x][y].getType() != CellType.EMPTY) continue;
+            if (x == 0 && y == 0) continue;
+
+            grid[x][y].setType(type);
+
+            // ИСПРАВЛЕНО: ток ставится только если до сыра остаётся путь без ловушек.
+            // Раньше ловушка могла перекрыть единственный проход: мышь училась её избегать
+            // и переставала доходить до сыра (примерно в каждом шестом лабиринте 15×15).
+            if (type == CellType.TRAP && !safePathExists()) {
+                grid[x][y].setType(CellType.EMPTY);
+                continue;
+            }
+
+            list.add(new int[]{x, y});
+            placed++;
+        }
+    }
+
+    /** Поиск в ширину от старта (0, 0) до сыра; клетки с током считаются непроходимыми. */
+    private boolean safePathExists() {
+        boolean[][] seen = new boolean[width][height];
+        Deque<int[]> queue = new ArrayDeque<>();
+        queue.add(new int[]{0, 0});
+        seen[0][0] = true;
+        int[][] delta = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}}; // NORTH, EAST, SOUTH, WEST
+
+        while (!queue.isEmpty()) {
+            int[] cur = queue.poll();
+            if (cur[0] == cheeseX && cur[1] == cheeseY) return true;
+
+            for (int dir = 0; dir < 4; dir++) {
+                if (grid[cur[0]][cur[1]].hasWall(dir)) continue;
+                int nx = cur[0] + delta[dir][0];
+                int ny = cur[1] + delta[dir][1];
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                if (seen[nx][ny] || grid[nx][ny].getType() == CellType.TRAP) continue;
+                seen[nx][ny] = true;
+                queue.add(new int[]{nx, ny});
+            }
+        }
+        return false;
+    }
+
+    public void restoreRewards() {
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                grid[x][y].setType(CellType.EMPTY);
+
+        grid[cheeseX][cheeseY].setType(CellType.CHEESE);
+
+        for (int[] pos : initialWater)
+            grid[pos[0]][pos[1]].setType(CellType.WATER);
+
+        for (int[] pos : initialTraps)
+            grid[pos[0]][pos[1]].setType(CellType.TRAP);
+    }
+
+
+    public int getWaterIndex(int x, int y) {
+        for (int i = 0; i < initialWater.size(); i++) {
+            int[] p = initialWater.get(i);
+            if (p[0] == x && p[1] == y) return i;
+        }
+        return -1;
+    }
+
+    public Cell getCell(int x, int y) { return grid[x][y]; }
+    public int getWidth()  { return width; }
+    public int getHeight() { return height; }
+}
