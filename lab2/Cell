@@ -1,0 +1,56 @@
+package lab2;
+
+public class Cell {
+
+    public static final int NORTH = 0;
+    public static final int EAST  = 1;
+    public static final int SOUTH = 2;
+    public static final int WEST  = 3;
+
+    private final int x;
+    private final int y;
+    private final boolean[] walls;
+
+    private boolean visited;
+    private CellType type;
+
+    public Cell(int x, int y) {
+        this.x = x;
+        this.y = y;
+        this.walls = new boolean[]{true, true, true, true};
+        this.visited = false;
+        this.type = CellType.EMPTY;
+    }
+
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public boolean isVisited() {
+        return visited;
+    }
+
+    public void setVisited(boolean visited) {
+        this.visited = visited;
+    }
+
+    public void removeWall(int direction) {
+        walls[direction] = false;
+    }
+
+    public boolean hasWall(int direction) {
+        return walls[direction];
+    }
+
+    public CellType getType() {
+        return type;
+    }
+
+    public void setType(CellType type) {
+        this.type = type;
+    }
+}
