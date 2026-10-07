@@ -1,0 +1,149 @@
+package lab2;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.Random;
+
+public class Mouse {
+
+    private final Random random = new Random();
+    private final Maze maze;
+    private final Map<Long, double[]> q = new HashMap<>();
+    private long waterMask;
+
+    private int x;
+    private int y;
+
+    private final double alpha;
+    private final double gamma;
+    private double epsilon;
+
+    private static final double MIN_EPSILON = 0.01;
+    private static final double EPSILON_DECAY = 0.9998;
+
+    public Mouse(Maze maze, double alpha, double gamma, double epsilon) {
+        this.maze = maze;
+        this.alpha = alpha;
+        this.gamma = gamma;
+        this.epsilon = epsilon;
+        this.x = 0;
+        this.y = 0;
+    }
+
+    private long key(int x, int y, long mask) {
+        return (mask * maze.getWidth() + x) * maze.getHeight() + y;
+    }
+
+    private double[] row(int x, int y, long mask) {
+        return q.computeIfAbsent(key(x, y, mask), k -> new double[4]);
+    }
+
+    public long getWaterMask() { return waterMask; }
+    public void setWaterMask(long mask) { this.waterMask = mask; }
+
+    public void decayEpsilon() {
+        epsilon = Math.max(MIN_EPSILON, epsilon * EPSILON_DECAY);
+    }
+
+    public double getEpsilon() {
+        return epsilon;
+    }
+
+    public void setEpsilon(double epsilon) {
+        this.epsilon = epsilon;
+    }
+
+    public int chooseAction() {
+        List<Integer> available = new ArrayList<>();
+        Cell cell = maze.getCell(x, y);
+
+        for (int action = 0; action < 4; action++) {
+            if (cell.hasWall(action)) continue;
+            if (!isInside(x, y, action)) continue;
+            available.add(action);
+        }
+
+        if (available.isEmpty()) return -1;
+
+
+        if (random.nextDouble() < epsilon) {
+            return available.get(random.nextInt(available.size()));
+        }
+        
+        double bestValue = Double.NEGATIVE_INFINITY;
+        List<Integer> bestActions = new ArrayList<>();
+
+        for (int action : available) {
+            double value = row(x, y, waterMask)[action];
+            if (value > bestValue) {
+                bestValue = value;
+                bestActions.clear();
+                bestActions.add(action);
+            } else if (Double.compare(value, bestValue) == 0) {
+                bestActions.add(action);
+            }
+        }
+
+        return bestActions.get(random.nextInt(bestActions.size()));
+    }
+
+    private boolean isInside(int x, int y, int action) {
+        switch (action) {
+            case Cell.NORTH: return y - 1 >= 0;
+            case Cell.EAST:  return x + 1 < maze.getWidth();
+            case Cell.SOUTH: return y + 1 < maze.getHeight();
+            case Cell.WEST:  return x - 1 >= 0;
+            default: return false;
+        }
+    }
+
+    public void update(int x, int y, long mask, int action, double reward,
+                       int newX, int newY, long newMask, boolean terminal) {
+        double[] r = row(x, y, mask);
+        double oldQ = r[action];
+        double target;
+
+        if (terminal) {
+            target = reward;
+        } else {
+            target = reward + gamma * getMaxQ(newX, newY, newMask);
+        }
+
+        r[action] = oldQ + alpha * (target - oldQ);
+    }
+
+    private double getMaxQ(int x, int y, long mask) {
+        double[] r = q.get(key(x, y, mask));
+        if (r == null) return 0;
+        double max = Double.NEGATIVE_INFINITY;
+        Cell cell = maze.getCell(x, y);
+
+        for (int action = 0; action < 4; action++) {
+            if (cell.hasWall(action)) continue;
+            if (!isInside(x, y, action)) continue;
+            if (r[action] > max) max = r[action];
+        }
+
+        return max == Double.NEGATIVE_INFINITY ? 0 : max;
+    }
+
+    public int getX() { return x; }
+    public int getY() { return y; }
+
+    public void setPosition(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public void reset() {
+        this.x = 0;
+        this.y = 0;
+        this.waterMask = 0;
+    }
+
+    public int getStateCount() {
+        return q.size();
+    }
+}
