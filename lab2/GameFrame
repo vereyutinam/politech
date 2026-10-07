@@ -1,0 +1,226 @@
+package lab2;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class GameFrame extends JFrame {
+
+    private Maze maze;
+    private Mouse mouse;
+    private Simulation sim;
+    private MazePanel panel;
+    private Timer timer;
+
+    private JTextField widthField  = new JTextField("15", 4);
+    private JTextField heightField = new JTextField("10", 4);
+
+    private boolean trained = false;
+
+    private JButton btnNew, btnTrain, btnStart, btnPause, btnReset;
+
+    public GameFrame() {
+        setTitle("Мышь в лабиринте");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        JPanel controls = new JPanel();
+
+        controls.add(new JLabel("Ширина:"));
+        controls.add(widthField);
+        controls.add(new JLabel("Высота:"));
+        controls.add(heightField);
+        controls.add(Box.createHorizontalStrut(20));
+
+        btnNew   = new JButton("Новый лабиринт");
+        btnTrain = new JButton("Обучить");
+        btnStart = new JButton("Старт");
+        btnPause = new JButton("Пауза");
+        btnReset = new JButton("Сброс мыши");
+
+        controls.add(btnNew);
+        controls.add(btnTrain);
+        controls.add(btnStart);
+        controls.add(btnPause);
+        controls.add(btnReset);
+        add(controls, BorderLayout.NORTH);
+
+        initMaze();
+        panel = new MazePanel(maze, mouse);
+        add(new JScrollPane(panel), BorderLayout.CENTER);
+
+        timer = new Timer(100, e -> {
+            if (!sim.isEpisodeFinished()) {
+                sim.step();
+                panel.repaint();
+            } else {
+                timer.stop();
+                String message = sim.isCheeseReached()
+                        ? "Мышь дошла до сыра за " + sim.getStep() + " шагов!"
+                        : "Мышь не дошла до сыра: закончился лимит в " + sim.getStep()
+                          + " шагов.\nПопробуйте обучить ещё раз или создать новый лабиринт.";
+                JOptionPane.showMessageDialog(this, message);
+            }
+        });
+
+        btnNew.addActionListener(e -> {
+            timer.stop();
+            initMaze();
+
+            remove(((BorderLayout) getContentPane().getLayout())
+                    .getLayoutComponent(BorderLayout.CENTER));
+
+            panel = new MazePanel(maze, mouse);
+            add(new JScrollPane(panel), BorderLayout.CENTER);
+
+            revalidate();
+            repaint();
+            pack();
+            setLocationRelativeTo(null);
+        });
+        
+        btnTrain.addActionListener(e -> {
+            timer.stop();
+            setButtonsEnabled(false);
+            setTitle("Мышь в лабиринте — идёт обучение...");
+
+            final int episodes = 20000;
+            final Mouse trainMouse = mouse;
+            final Simulation trainSim = sim;
+
+            new SwingWorker<String, Void>() {
+                @Override
+                protected String doInBackground() {
+                    trainMouse.setEpsilon(1.0);
+                    trainSim.setLearning(true);
+
+                    long start = System.currentTimeMillis();
+                    int[] stepsHistory = new int[episodes];
+                    int reachedLast1000 = 0;
+
+                    for (int ep = 0; ep < episodes; ep++) {
+                        trainSim.startEpisode();
+                        while (!trainSim.isEpisodeFinished()) {
+                            trainSim.step();
+                        }
+                        stepsHistory[ep] = trainSim.getStep();
+                        if (ep >= episodes - 1000 && trainSim.isCheeseReached()) {
+                            reachedLast1000++;
+                        }
+                        trainMouse.decayEpsilon();
+                    }
+
+                    long elapsed = System.currentTimeMillis() - start;
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Обучение завершено за ").append(elapsed).append(" мс\n");
+                    sb.append("Сыр найден в ").append(reachedLast1000)
+                      .append(" из 1000 последних эпизодов\n");
+                    sb.append("Состояний в Q-таблице: ").append(trainMouse.getStateCount()).append("\n\n");
+                    sb.append("Эпизод → шагов:\n");
+                    for (int i = 0; i < episodes; i += episodes / 10) {
+                        sb.append(i + 1).append(": ").append(stepsHistory[i]).append("\n");
+                    }
+                    sb.append(episodes).append(": ").append(stepsHistory[episodes - 1]).append("\n");
+                    return sb.toString();
+                }
+
+                @Override
+                protected void done() {
+                    setTitle("Мышь в лабиринте");
+                    setButtonsEnabled(true);
+                    try {
+                        String report = get();
+                        if (trainMouse == mouse) {
+                            trained = true;
+                            sim.startEpisode();
+                            panel.repaint();
+                        }
+                        JOptionPane.showMessageDialog(GameFrame.this, report);
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(GameFrame.this,
+                                "Ошибка при обучении: " + ex.getMessage());
+                    }
+                }
+            }.execute();
+        });
+        
+        btnStart.addActionListener(e -> {
+            if (trained) {
+                mouse.setEpsilon(0.0);
+            } else {
+                mouse.setEpsilon(1.0);
+            }
+            sim.setLearning(false);
+
+            sim.startEpisode();
+            timer.start();
+        });
+
+        // Пауза
+        btnPause.addActionListener(e -> timer.stop());
+
+        // Сброс мыши
+        btnReset.addActionListener(e -> {
+            sim.startEpisode();
+            panel.repaint();
+        });
+
+        pack();
+        setLocationRelativeTo(null);
+    }
+
+    private void setButtonsEnabled(boolean enabled) {
+        btnNew.setEnabled(enabled);
+        btnTrain.setEnabled(enabled);
+        btnStart.setEnabled(enabled);
+        btnPause.setEnabled(enabled);
+        btnReset.setEnabled(enabled);
+        widthField.setEnabled(enabled);
+        heightField.setEnabled(enabled);
+    }
+
+    private void initMaze() {
+        int width, height;
+
+        try {
+            width  = Integer.parseInt(widthField.getText().trim());
+            height = Integer.parseInt(heightField.getText().trim());
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Введите целые числа для ширины и высоты!");
+            width = 15;
+            height = 10;
+        }
+
+        if (width < 5 || height < 5) {
+            JOptionPane.showMessageDialog(this, "Минимальный размер — 5×5.");
+            width  = Math.max(width, 5);
+            height = Math.max(height, 5);
+        }
+
+        if (width > 15 || height > 15) {
+            JOptionPane.showMessageDialog(this,
+                    "Максимальный размер — 15на15.\n"
+                            + "Обучение больших лабиринтов занимает много времени.");
+            width  = Math.min(width, 15);
+            height = Math.min(height, 15);
+        }
+
+        widthField.setText(String.valueOf(width));
+        heightField.setText(String.valueOf(height));
+
+        maze = new Maze(width, height);
+        maze.generate();
+        maze.replaceReward();
+
+
+        mouse = new Mouse(maze, 0.2, 0.99, 1.0);
+        sim = new Simulation(maze, mouse);
+
+        trained = false;
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new GameFrame().setVisible(true));
+    }
+}
