@@ -1,0 +1,24 @@
+package lab2;
+
+public enum CellType {
+    EMPTY(0, false),
+    CHEESE(500, false),
+    WATER(10, true),
+    TRAP(-50, false);
+
+    private final int reward;
+    private final boolean consumed;
+
+    CellType(int reward, boolean consumed) {
+        this.reward = reward;
+        this.consumed = consumed;
+    }
+
+    public int getReward() {
+        return reward;
+    }
+
+    public boolean isConsumed() {
+        return consumed;
+    }
+}
