@@ -1,0 +1,102 @@
+package lab2;
+
+public class Simulation {
+
+    public static final double STEP_PENALTY = -0.1;
+
+    private final Maze maze;
+    private final Mouse mouse;
+    private final int maxStepsPerEpisode;
+
+    private int episode;
+    private int step;
+    private boolean episodeFinished;
+    private boolean cheeseReached;
+    private boolean learning = true;
+
+    public Simulation(Maze maze, Mouse mouse) {
+        this.maze = maze;
+        this.mouse = mouse;
+        this.episode = 0;
+        this.step = 0;
+        this.maxStepsPerEpisode = maze.getWidth() * maze.getHeight() * 10;
+        this.episodeFinished = false;
+    }
+
+    public void step() {
+        if (episodeFinished) return;
+
+        int action = mouse.chooseAction();
+        if (action == -1) {
+            finishEpisode();
+            return;
+        }
+
+        int oldX = mouse.getX();
+        int oldY = mouse.getY();
+
+        int[] delta = actionToDelta(action);
+        int newX = oldX + delta[0];
+        int newY = oldY + delta[1];
+
+        Cell newCell = maze.getCell(newX, newY);
+        double reward = newCell.getType().getReward() + STEP_PENALTY;
+
+        boolean isCheese = newCell.getType() == CellType.CHEESE;
+        // ИСПРАВЛЕНО: отмечаем выпитую лужу в маске состояния мыши.
+        long oldMask = mouse.getWaterMask();
+        long newMask = oldMask;
+        if (newCell.getType() == CellType.WATER) {
+            int idx = maze.getWaterIndex(newX, newY);
+            if (idx >= 0) newMask |= 1L << idx;
+        }
+
+        if (newCell.getType().isConsumed()) {
+            newCell.setType(CellType.EMPTY);
+        }
+
+        mouse.setPosition(newX, newY);
+        mouse.setWaterMask(newMask);
+        if (learning) {
+            mouse.update(oldX, oldY, oldMask, action, reward, newX, newY, newMask, isCheese);
+        }
+
+        step++;
+
+        if (isCheese) {
+            cheeseReached = true;
+            finishEpisode();
+        } else if (step >= maxStepsPerEpisode) {
+            finishEpisode();
+        }
+    }
+
+    private int[] actionToDelta(int action) {
+        switch (action) {
+            case Cell.NORTH: return new int[]{0, -1};
+            case Cell.EAST:  return new int[]{1, 0};
+            case Cell.SOUTH: return new int[]{0, 1};
+            case Cell.WEST:  return new int[]{-1, 0};
+            default: return new int[]{0, 0};
+        }
+    }
+
+    private void finishEpisode() {
+        episode++;
+        episodeFinished = true;
+    }
+
+    public void startEpisode() {
+        mouse.reset();
+        maze.restoreRewards();
+        step = 0;
+        episodeFinished = false;
+        cheeseReached = false;
+    }
+
+    public boolean isEpisodeFinished() { return episodeFinished; }
+    public boolean isCheeseReached() { return cheeseReached; }
+    public void setLearning(boolean learning) { this.learning = learning; }
+    public int getEpisode() { return episode; }
+    public int getStep() { return step; }
+}
