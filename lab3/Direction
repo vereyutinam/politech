@@ -1,0 +1,22 @@
+package lab3;
+
+
+public enum Direction {
+    UP(-1, 0), RIGHT(0, 1), DOWN(1, 0), LEFT(0, -1);
+
+    public final int dr, dc;
+
+    Direction(int dr, int dc) {
+        this.dr = dr;
+        this.dc = dc;
+    }
+
+    public Direction right() { return values()[(ordinal() + 1) % 4]; }
+
+    public Direction left() { return values()[(ordinal() + 3) % 4]; }
+
+    public static Direction of(int dr, int dc) {
+        for (Direction d : values()) if (d.dr == dr && d.dc == dc) return d;
+        throw new IllegalArgumentException("not a unit step: " + dr + "," + dc);
+    }
+}
