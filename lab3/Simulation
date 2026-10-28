@@ -1,0 +1,34 @@
+package lab3;
+
+import java.util.Random;
+
+
+public class Simulation {
+    public static void main(String[] args) {
+        int games = args.length > 0 ? Integer.parseInt(args[0]) : 500;
+        Random rnd = new Random(42);
+        System.out.printf("%-6s %-8s %-8s %-8s %-8s%n", "N", "победы", "гибель", "тупик", "шагов(ср.)");
+        for (int n : new int[]{4, 6, 8, 10, 12}) {
+            int win = 0, dead = 0, stuck = 0;
+            long steps = 0;
+            for (int g = 0; g < games; g++) {
+                World w = new World(n, rnd);
+                Agent a = new Agent(n, w.hr, w.hc, w.dir);
+                a.perceive(null, w.getPercept());
+                int step = 0;
+                while (w.alive && !w.won && step < 5000) {
+                    Action act = a.decide();
+                    if (act == null) break;
+                    w.act(act);
+                    a.perceive(act, w.getPercept());
+                    step++;
+                }
+                steps += step;
+                if (w.won) win++;
+                else if (!w.alive) dead++;
+                else stuck++;
+            }
+            System.out.printf("%-6d %-8d %-8d %-8d %-8.1f%n", n, win, dead, stuck, steps / (double) games);
+        }
+    }
+}
