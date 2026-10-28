@@ -1,0 +1,183 @@
+package lab3;
+
+import java.util.ArrayDeque;
+import java.util.Random;
+
+
+public class World {
+
+    public static final double PIT_RATE = 0.12;
+
+    public final int n;
+    public final boolean[][] pit;
+    public int wr, wc;          // Вампус
+    public boolean wumpusAlive = true;
+    public int gr, gc;          // золото
+    public boolean goldTaken = false;
+    public int hr, hc;          // охотник
+    public Direction dir = Direction.UP;
+    public boolean hasArrow = true;
+    public boolean alive = true;
+    public boolean won = false;
+    public String message = "";
+
+    private boolean bump, scream;
+    private Percept percept;
+
+    public World(int n, Random rnd) {
+        this.n = n;
+        this.pit = new boolean[n][n];
+        do {
+            generate(rnd);
+        } while (!goldReachable());
+        hr = n - 1;
+        hc = n - 1;
+        percept = computePercept();
+    }
+
+    private void generate(Random rnd) {
+        for (boolean[] row : pit) java.util.Arrays.fill(row, false);
+        int sr = n - 1, sc = n - 1;
+
+        do {
+            wr = rnd.nextInt(n);
+            wc = rnd.nextInt(n);
+        } while (Math.abs(wr - sr) + Math.abs(wc - sc) < 3);
+
+        do {
+            Direction d = Direction.values()[rnd.nextInt(4)];
+            gr = wr + d.dr;
+            gc = wc + d.dc;
+        } while (!inside(gr, gc) || (gr == sr && gc == sc));
+
+        int count = Math.max(1, (int) Math.round(n * n * PIT_RATE));
+        int placed = 0, guard = 0;
+        while (placed < count && guard++ < 100000) {
+            int r = rnd.nextInt(n), c = rnd.nextInt(n);
+            if (pit[r][c]) continue;
+            if (Math.abs(r - sr) + Math.abs(c - sc) <= 1) continue;
+            if ((r == wr && c == wc) || (r == gr && c == gc)) continue;
+            if (pitNextTo(r, c)) continue;      // рядом по горизонтали/вертикали ям быть не может
+            pit[r][c] = true;
+            placed++;
+        }
+    }
+
+
+    private boolean pitNextTo(int r, int c) {
+        for (Direction d : Direction.values()) {
+            int a = r + d.dr, b = c + d.dc;
+            if (inside(a, b) && pit[a][b]) return true;
+        }
+        return false;
+    }
+
+
+    private boolean goldReachable() {
+        boolean[][] seen = new boolean[n][n];
+        ArrayDeque<int[]> q = new ArrayDeque<>();
+        q.add(new int[]{n - 1, n - 1});
+        seen[n - 1][n - 1] = true;
+        while (!q.isEmpty()) {
+            int[] cur = q.poll();
+            if (cur[0] == gr && cur[1] == gc) return true;
+            for (Direction d : Direction.values()) {
+                int r = cur[0] + d.dr, c = cur[1] + d.dc;
+                if (!inside(r, c) || seen[r][c] || pit[r][c] || (r == wr && c == wc)) continue;
+                seen[r][c] = true;
+                q.add(new int[]{r, c});
+            }
+        }
+        return false;
+    }
+
+    public boolean inside(int r, int c) {
+        return r >= 0 && r < n && c >= 0 && c < n;
+    }
+
+    public Percept getPercept() { return percept; }
+
+
+    public void act(Action a) {
+        if (!alive || won) return;
+        bump = false;
+        scream = false;
+        message = a.title;
+        switch (a) {
+            case TURN_LEFT:
+                dir = dir.left();
+                break;
+            case TURN_RIGHT:
+                dir = dir.right();
+                break;
+            case FORWARD: {
+                int r = hr + dir.dr, c = hc + dir.dc;
+                if (!inside(r, c)) {
+                    bump = true;
+                    message = "удар о стену";
+                } else {
+                    hr = r;
+                    hc = c;
+                    if (pit[hr][hc]) {
+                        alive = false;
+                        message = "Охотник упал в яму";
+                    } else if (wumpusAlive && hr == wr && hc == wc) {
+                        alive = false;
+                        message = "Охотника съел Вампус";
+                    }
+                }
+                break;
+            }
+            case SHOOT: {
+                if (!hasArrow) {
+                    message = "стрелы нет";
+                    break;
+                }
+                hasArrow = false;
+                int r = hr + dir.dr, c = hc + dir.dc;
+                while (inside(r, c)) {
+                    if (wumpusAlive && r == wr && c == wc) {
+                        wumpusAlive = false;
+                        scream = true;
+                        message = "выстрел: Вампус убит";
+                        break;
+                    }
+                    r += dir.dr;
+                    c += dir.dc;
+                }
+                if (!scream) message = "выстрел: мимо";
+                break;
+            }
+            case GRAB:
+                if (!goldTaken && hr == gr && hc == gc) {
+                    if (wumpusAlive) {
+                        message = "Вампус охраняет золото";
+                    } else {
+                        goldTaken = true;
+                        won = true;
+                        message = "Охотник взял золото!";
+                    }
+                } else {
+                    message = "здесь нет золота";
+                }
+                break;
+        }
+        percept = computePercept();
+    }
+
+    private boolean adjacent(int r1, int c1, int r2, int c2) {
+        return Math.abs(r1 - r2) + Math.abs(c1 - c2) == 1;
+    }
+
+    private Percept computePercept() {
+        boolean stench = wumpusAlive && adjacent(hr, hc, wr, wc);
+        boolean breeze = false;
+        for (Direction d : Direction.values()) {
+            int r = hr + d.dr, c = hc + d.dc;
+            if (inside(r, c) && pit[r][c]) breeze = true;
+        }
+
+        boolean glitter = !goldTaken && hr == gr && hc == gc;
+        return new Percept(stench, breeze, glitter, bump, scream);
+    }
+}
