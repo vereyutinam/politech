@@ -1,0 +1,543 @@
+package lab3;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.List;
+
+
+public class Agent {
+    public static final int UNKNOWN = 0, SAFE = 1, PIT = 2, WUMPUS = 3;
+
+    private final int n;
+    private final KnowledgeBase kb;
+    private final boolean[][] visited;
+    private final boolean[][] breezeAt;
+    private final int[][] status;
+    private final boolean[][] pitPossible, wumpPossible;
+    private final String[][] marks;
+
+    private int r, c;
+    private Direction dir;
+    private boolean hasArrow = true;
+    private boolean wumpusDead = false;
+    private boolean anyStench = false;
+    private boolean dirty = true;
+    private boolean stuck = false;
+    private final boolean[][] goldPossible;   // где может лежать золото
+    private boolean goldClause = false;
+    private boolean[][] wumpusWas = null;      // где мог стоять убитый Вампус
+    private boolean glitterSeen = false;
+
+    private final Deque<Action> plan = new ArrayDeque<>();
+    private String thought = "";
+
+    public Agent(int n, int startR, int startC, Direction startDir) {
+        this.n = n;
+        this.kb = new KnowledgeBase(n);
+        this.visited = new boolean[n][n];
+        this.breezeAt = new boolean[n][n];
+        this.status = new int[n][n];
+        this.pitPossible = new boolean[n][n];
+        this.wumpPossible = new boolean[n][n];
+        this.marks = new String[n][n];
+        this.goldPossible = new boolean[n][n];
+        for (boolean[] row : goldPossible) Arrays.fill(row, true);
+        for (String[] row : marks) Arrays.fill(row, "");
+        this.r = startR;
+        this.c = startC;
+        this.dir = startDir;
+       
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (j + 1 < n) kb.addClause(-kb.p(i, j), -kb.p(i, j + 1));
+                if (i + 1 < n) kb.addClause(-kb.p(i, j), -kb.p(i + 1, j));
+            }
+        }
+    }
+
+    
+
+    public String getThought() { return thought; }
+
+    public boolean isStuck() { return stuck; }
+
+    public int getStatus(int i, int j) { return status[i][j]; }
+
+    public boolean isVisited(int i, int j) { return visited[i][j]; }
+
+    public String getMark(int i, int j) { return marks[i][j]; }
+
+    public int kbSize() { return kb.size(); }
+
+
+
+
+    public void perceive(Action a, Percept p) {
+        if (a != null) {
+            switch (a) {
+                case TURN_LEFT:
+                    dir = dir.left();
+                    break;
+                case TURN_RIGHT:
+                    dir = dir.right();
+                    break;
+                case FORWARD:
+                    if (!p.bump) {
+                        r += dir.dr;
+                        c += dir.dc;
+                    }
+                    break;
+                case SHOOT:
+                    hasArrow = false;
+                    dirty = true;
+                    if (p.scream) {
+ 
+                        wumpusWas = new boolean[n][n];
+                        for (int i = r + dir.dr, j = c + dir.dc; i >= 0 && i < n && j >= 0 && j < n;
+                             i += dir.dr, j += dir.dc)
+                            if (wumpPossible[i][j]) wumpusWas[i][j] = true;
+                        wumpusDead = true;
+                        kb.killWumpus();
+                    } else {
+
+                        int i = r + dir.dr, j = c + dir.dc;
+                        while (i >= 0 && i < n && j >= 0 && j < n) {
+                            kb.addUnit(-kb.w(i, j));
+                            i += dir.dr;
+                            j += dir.dc;
+                        }
+                    }
+                    break;
+                case GRAB:
+                    goldPossible[r][c] = false; 
+                    dirty = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (!visited[r][c]) {
+            visited[r][c] = true;
+            tell(p);
+            dirty = true;
+        }
+        if (p.bump) dirty = true;
+        if (dirty) plan.clear();
+    }
+
+    private List<int[]> neighbours(int i, int j) {
+        List<int[]> res = new ArrayList<>(4);
+        for (Direction d : Direction.values()) {
+            int a = i + d.dr, b = j + d.dc;
+            if (a >= 0 && a < n && b >= 0 && b < n) res.add(new int[]{a, b});
+        }
+        return res;
+    }
+
+    private int[] wClause(List<int[]> nb) {
+        int[] cl = new int[nb.size()];
+        for (int k = 0; k < cl.length; k++) cl[k] = kb.w(nb.get(k)[0], nb.get(k)[1]);
+        return cl;
+    }
+
+
+    private void tell(Percept p) {
+        List<int[]> nb = neighbours(r, c);
+        kb.addUnit(-kb.p(r, c));                     
+        if (!wumpusDead) kb.addUnit(-kb.w(r, c));    
+        breezeAt[r][c] = p.breeze;
+
+        
+        if (p.breeze) {
+            int[] cl = new int[nb.size()];
+            for (int k = 0; k < cl.length; k++) cl[k] = kb.p(nb.get(k)[0], nb.get(k)[1]);
+            kb.addClause(cl);
+        } else {
+            for (int[] x : nb) kb.addUnit(-kb.p(x[0], x[1]));
+        }
+
+   
+        if (!wumpusDead) {
+            if (p.stench) {
+                anyStench = true;
+                kb.addClause(wClause(nb));
+            } else {
+                for (int[] x : nb) kb.addUnit(-kb.w(x[0], x[1]));
+            }
+        }
+
+        
+        if (p.glitter) {
+            glitterSeen = true;
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < n; j++)
+                    if (i != r || j != c) goldPossible[i][j] = false;
+        } else {
+            goldPossible[r][c] = false;
+        }
+
+        
+        int cnt = 0, gi = -1, gj = -1;
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                if (goldPossible[i][j]) {
+                    cnt++;
+                    gi = i;
+                    gj = j;
+                }
+        if (cnt == 1 && !goldClause && !wumpusDead) {
+            goldClause = true;
+            anyStench = true;
+            kb.addClause(wClause(neighbours(gi, gj)));
+        }
+    }
+
+    
+
+    private String goldMark(int i, int j) {
+        if (!goldPossible[i][j]) return "";
+        int cnt = 0;
+        for (boolean[] row : goldPossible) for (boolean b : row) if (b) cnt++;
+        if (!glitterSeen && cnt > 8) return "";      
+        return cnt == 1 ? "G!" : "G?";
+    }
+
+
+
+    private void restrictGoldByWumpus() {
+        boolean[][] src;
+        if (wumpusDead) src = wumpusWas;
+        else if (anyStench) src = wumpPossible;
+        else return;
+        if (src == null) return;
+        boolean[][] near = new boolean[n][n];
+        boolean any = false;
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                if (src[i][j]) {
+                    any = true;
+                    for (int[] x : neighbours(i, j)) near[x[0]][x[1]] = true;
+                }
+        if (!any) return;
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                if (!near[i][j]) goldPossible[i][j] = false;
+    }
+
+    private void infer() {
+        boolean[][] mentioned = kb.mentioned();
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (visited[i][j]) {
+                    status[i][j] = SAFE;
+                    pitPossible[i][j] = false;
+                    wumpPossible[i][j] = false;
+                    continue;
+                }
+                status[i][j] = UNKNOWN;
+                pitPossible[i][j] = true;
+                wumpPossible[i][j] = false;
+                if (!mentioned[i][j]) continue;
+
+                boolean noPit = kb.entails(-kb.p(i, j));
+                boolean noW = wumpusDead || kb.entails(-kb.w(i, j));
+                pitPossible[i][j] = !noPit;
+                wumpPossible[i][j] = !noW;
+                if (!noPit && kb.entails(kb.p(i, j))) status[i][j] = PIT;
+                else if (!noW && kb.entails(kb.w(i, j))) status[i][j] = WUMPUS;
+                else if (noPit && noW) status[i][j] = SAFE;
+            }
+        }
+
+       
+        restrictGoldByWumpus();
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                if (status[i][j] == PIT || status[i][j] == WUMPUS) goldPossible[i][j] = false;
+
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                String m = "";
+                if (!visited[i][j]) {
+                    switch (status[i][j]) {
+                        case PIT:
+                            m = "P!";
+                            break;
+                        case WUMPUS:
+                            m = "W!";
+                            break;
+                        case SAFE:
+                            m = "OK";
+                            break;
+                        default:
+                            boolean front = false;
+                            for (int[] x : neighbours(i, j)) if (visited[x[0]][x[1]]) front = true;
+                            if (front)
+                                m = ((pitPossible[i][j] ? "P?" : "") + (wumpPossible[i][j] ? " W?" : "")).trim();
+                    }
+                }
+                String gm = goldMark(i, j);
+                marks[i][j] = gm.isEmpty() ? m : (m + " " + gm).trim();
+            }
+        }
+    }
+
+ 
+    public Action decide() {
+        if (stuck) return null;
+        if (plan.isEmpty()) {
+            if (dirty) {
+                infer();
+                dirty = false;
+            }
+            makePlan();
+            if (plan.isEmpty()) {
+                stuck = true;
+                if (thought.isEmpty()) thought = "Безопасных ходов нет - агент остановился";
+                return null;
+            }
+        }
+        return plan.poll();
+    }
+
+    private boolean passable(int i, int j) {
+        return visited[i][j] || status[i][j] == SAFE;
+    }
+
+    private static class Reach {
+        int[] dist;
+        int[] prev;
+    }
+
+    private Reach reach() {
+        Reach rc = new Reach();
+        rc.dist = new int[n * n];
+        rc.prev = new int[n * n];
+        Arrays.fill(rc.dist, -1);
+        ArrayDeque<Integer> q = new ArrayDeque<>();
+        rc.dist[r * n + c] = 0;
+        q.add(r * n + c);
+        while (!q.isEmpty()) {
+            int cur = q.poll();
+            for (int[] x : neighbours(cur / n, cur % n)) {
+                int id = x[0] * n + x[1];
+                if (rc.dist[id] >= 0 || !passable(x[0], x[1])) continue;
+                rc.dist[id] = rc.dist[cur] + 1;
+                rc.prev[id] = cur;
+                q.add(id);
+            }
+        }
+        return rc;
+    }
+
+    private List<int[]> pathTo(Reach rc, int tr, int tc) {
+        LinkedList<int[]> path = new LinkedList<>();
+        int cur = tr * n + tc;
+        while (cur != r * n + c) {
+            path.addFirst(new int[]{cur / n, cur % n});
+            cur = rc.prev[cur];
+        }
+        return path;
+    }
+
+    private void turn(Direction from, Direction to, List<Action> out) {
+        int diff = (to.ordinal() - from.ordinal() + 4) % 4;
+        if (diff == 1) out.add(Action.TURN_RIGHT);
+        else if (diff == 2) {
+            out.add(Action.TURN_RIGHT);
+            out.add(Action.TURN_RIGHT);
+        } else if (diff == 3) out.add(Action.TURN_LEFT);
+    }
+
+    private Direction addPath(List<int[]> path, List<Action> out) {
+        Direction d = dir;
+        int pr = r, pc = c;
+        for (int[] cell : path) {
+            Direction need = Direction.of(cell[0] - pr, cell[1] - pc);
+            turn(d, need, out);
+            out.add(Action.FORWARD);
+            d = need;
+            pr = cell[0];
+            pc = cell[1];
+        }
+        return d;
+    }
+
+    private void makePlan() {
+        thought = "";
+
+        if (wumpusDead) {
+            Reach rc = reach();
+            int best = -1, bestDist = Integer.MAX_VALUE, cnt = 0;
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < n; j++)
+                    if (goldPossible[i][j]) {
+                        cnt++;
+                        int d = rc.dist[i * n + j];
+                        if (d >= 0 && d < bestDist) {
+                            bestDist = d;
+                            best = i * n + j;
+                        }
+                    }
+            if (best >= 0 && cnt < n * n) {
+                List<Action> acts = new ArrayList<>();
+                if (bestDist > 0) addPath(pathTo(rc, best / n, best % n), acts);
+                acts.add(Action.GRAB);
+                plan.addAll(acts);
+                thought = (cnt == 1 ? "Золото в (" : "Золото возможно в (") + best / n + "," + best % n + ") - иду за ним";
+                return;
+            }
+        }
+
+        
+        if (planShot(true)) return;
+
+       
+        Reach rc = reach();
+        boolean guided = wumpusDead && goldCount() < n * n;
+        int best = -1, bestGold = Integer.MAX_VALUE, bestDist = Integer.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int d = rc.dist[i * n + j];
+                if (visited[i][j] || status[i][j] != SAFE || d <= 0) continue;
+                int gd = guided ? distToGold(i, j) : 0;
+                if (gd < bestGold || (gd == bestGold && d < bestDist)) {
+                    bestGold = gd;
+                    bestDist = d;
+                    best = i * n + j;
+                }
+            }
+        }
+        if (best >= 0) {
+            int tr = best / n, tc = best % n;
+            List<Action> acts = new ArrayList<>();
+            addPath(pathTo(rc, tr, tc), acts);
+            plan.addAll(acts);
+            thought = guided
+                    ? "Золото должно быть рядом с местом, где стоял Вампус - иду к (" + tr + "," + tc + ")"
+                    : "Вывод: клетка (" + tr + "," + tc + ") безопасна - иду туда";
+            return;
+        }
+
+      
+        if (planShot(false)) return;
+
+       
+        if (planRisky(rc)) return;
+
+        thought = "Безопасных ходов нет - агент остановился";
+    }
+
+   
+    private int goldCount() {
+        int cnt = 0;
+        for (boolean[] row : goldPossible) for (boolean b : row) if (b) cnt++;
+        return cnt;
+    }
+
+  
+    private int distToGold(int i, int j) {
+        int best = Integer.MAX_VALUE;
+        for (int a = 0; a < n; a++)
+            for (int b = 0; b < n; b++)
+                if (goldPossible[a][b]) best = Math.min(best, Math.abs(a - i) + Math.abs(b - j));
+        return best;
+    }
+
+    private List<int[]> wumpusCandidates() {
+        List<int[]> cand = new ArrayList<>();
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                if (!visited[i][j] && wumpPossible[i][j]) cand.add(new int[]{i, j});
+        return cand;
+    }
+
+    private boolean planShot(boolean certain) {
+        if (wumpusDead || !hasArrow) return false;
+        if (!anyStench && !certain) return false;
+        List<int[]> cand = wumpusCandidates();
+        if (cand.isEmpty()) return false;
+        boolean[][] isCand = new boolean[n][n];
+        for (int[] x : cand) isCand[x[0]][x[1]] = true;
+
+        Reach rc = reach();
+        int bestCount = 0, bestDist = Integer.MAX_VALUE, bi = -1, bj = -1;
+        Direction bd = null;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int dist = rc.dist[i * n + j];
+                if (dist < 0) continue;
+                for (Direction d : Direction.values()) {
+                    int count = 0;
+                    for (int a = i + d.dr, b = j + d.dc; a >= 0 && a < n && b >= 0 && b < n; a += d.dr, b += d.dc)
+                        if (isCand[a][b]) count++;
+                    if (count == 0) continue;
+                    if (certain && count < cand.size()) continue;
+                    if (count > bestCount || (count == bestCount && dist < bestDist)) {
+                        bestCount = count;
+                        bestDist = dist;
+                        bi = i;
+                        bj = j;
+                        bd = d;
+                    }
+                }
+            }
+        }
+        if (bi < 0) return false;
+
+        List<Action> acts = new ArrayList<>();
+        Direction d = dir;
+        if (bi != r || bj != c) d = addPath(pathTo(rc, bi, bj), acts);
+        turn(d, bd, acts);
+        acts.add(Action.SHOOT);
+        plan.addAll(acts);
+        if (certain) {
+            int[] w = cand.get(0);
+            thought = "Вывод: Вампус в (" + w[0] + "," + w[1] + ") - стреляю из (" + bi + "," + bj + ")";
+        } else {
+            thought = "Безопасных клеток нет - стреляю из (" + bi + "," + bj + "), вариантов Вампуса: " + cand.size();
+        }
+        return true;
+    }
+
+    private boolean planRisky(Reach rc) {
+        int bestScore = Integer.MAX_VALUE, bestDist = Integer.MAX_VALUE;
+        int bt = -1, bFrom = -1;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (visited[i][j]) continue;
+                if (status[i][j] == PIT) continue;
+                if (visited[i][j] || status[i][j] != UNKNOWN) continue;
+                int from = -1, fd = Integer.MAX_VALUE;
+                int breezy = 0;
+                for (int[] x : neighbours(i, j)) {
+                    int id = x[0] * n + x[1];
+                    if (rc.dist[id] >= 0 && rc.dist[id] < fd) {
+                        fd = rc.dist[id];
+                        from = id;
+                    }
+                    if (visited[x[0]][x[1]] && breezeAt[x[0]][x[1]]) breezy++;
+                }
+                if (from < 0) continue;
+                int score = breezy * 10 + (wumpPossible[i][j] ? 5 : 0) + (status[i][j] == WUMPUS ? 100 : 0) - (wumpusDead && goldPossible[i][j] && goldCount() < n * n ? 1 : 0);
+                if (score < bestScore || (score == bestScore && fd < bestDist)) {
+                    bestScore = score;
+                    bestDist = fd;
+                    bt = i * n + j;
+                    bFrom = from;
+                }
+            }
+        }
+        if (bt < 0) return false;
+        List<Action> acts = new ArrayList<>();
+        List<int[]> path = bFrom == r * n + c ? new ArrayList<>() : pathTo(rc, bFrom / n, bFrom % n);
+        path.add(new int[]{bt / n, bt % n});
+        addPath(path, acts);
+        plan.addAll(acts);
+        thought = "Безопасных клеток нет - рискую: иду в (" + bt / n + "," + bt % n + ")";
+        return true;
+    }
+}
