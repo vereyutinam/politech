@@ -1,0 +1,125 @@
+package lab3;
+
+import javax.swing.JPanel;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+
+
+public class BoardView extends JPanel {
+    private static final Color EMPTY = new Color(255, 255, 240);
+    private static final Color VISITED = new Color(236, 247, 230);
+    private static final Color PIT = new Color(60, 60, 60);
+    private static final Color WUMPUS = new Color(200, 80, 80);
+    private static final Color WUMPUS_DEAD = new Color(215, 180, 180);
+    private static final Color GOLD = new Color(255, 238, 150);
+    private static final Color HUNTER = new Color(153, 217, 255);
+    private static final Color HUNTER_DEAD = new Color(255, 170, 120);
+    private static final Color GRID = new Color(128, 128, 128);
+
+    private World world;
+    private Agent agent;
+    private boolean showKnowledge = true;
+
+    public BoardView() {
+        setBackground(new Color(242, 242, 242));
+    }
+
+    public void setModel(World world, Agent agent) {
+        this.world = world;
+        this.agent = agent;
+        repaint();
+    }
+
+    public void setShowKnowledge(boolean show) {
+        this.showKnowledge = show;
+        repaint();
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        int n = world == null ? 10 : world.n;
+        int cell = n <= 10 ? 62 : Math.max(36, 620 / n);
+        return new Dimension(n * cell + 2, n * cell + 2);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g0) {
+        super.paintComponent(g0);
+        if (world == null) return;
+        Graphics2D g = (Graphics2D) g0.create();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        int n = world.n;
+        int cell = Math.min((getWidth() - 2) / n, (getHeight() - 2) / n);
+        int ox = (getWidth() - cell * n) / 2;
+        int oy = (getHeight() - cell * n) / 2;
+        Font big = new Font(Font.SANS_SERIF, Font.BOLD, Math.max(12, cell * 36 / 62));
+        Font small = new Font(Font.SANS_SERIF, Font.BOLD, Math.max(8, cell * 12 / 62));
+
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int x = ox + j * cell, y = oy + i * cell;
+                Color bg = EMPTY;
+                String letter = null;
+                if (showKnowledge && agent != null && agent.isVisited(i, j)) bg = VISITED;
+                if (world.pit[i][j]) {
+                    bg = PIT;
+                    letter = "P";
+                }
+                if (i == world.wr && j == world.wc) {
+                    bg = world.wumpusAlive ? WUMPUS : WUMPUS_DEAD;
+                    letter = "W";
+                }
+                if (i == world.gr && j == world.gc && !world.goldTaken) {
+                    bg = GOLD;
+                    letter = "G";
+                }
+                if (i == world.hr && j == world.hc) {
+                    bg = world.alive ? HUNTER : HUNTER_DEAD;
+                    letter = "H";
+                }
+                g.setColor(bg);
+                g.fillRect(x, y, cell, cell);
+                g.setColor(GRID);
+                g.drawRect(x, y, cell, cell);
+
+                if (letter != null) {
+                    g.setFont(big);
+                    g.setColor(Color.BLACK);
+                    FontMetrics fm = g.getFontMetrics();
+                    g.drawString(letter, x + (cell - fm.stringWidth(letter)) / 2,
+                            y + (cell - fm.getHeight()) / 2 + fm.getAscent());
+                }
+
+               
+                if (showKnowledge && agent != null) {
+                    String m = agent.getMark(i, j);
+                    if (!m.isEmpty()) {
+                        g.setFont(small);
+                        int st = agent.getStatus(i, j);
+                        if (bg == PIT || bg == WUMPUS) g.setColor(Color.WHITE);
+                        else if (st == Agent.SAFE) g.setColor(new Color(20, 130, 40));
+                        else if (st == Agent.PIT || st == Agent.WUMPUS) g.setColor(new Color(190, 0, 0));
+                        else g.setColor(new Color(200, 110, 0));
+                        g.drawString(m, x + 3, y + g.getFontMetrics().getAscent() + 1);
+                    }
+                }
+            }
+        }
+
+
+        int cx = ox + world.hc * cell + cell / 2;
+        int cy = oy + world.hr * cell + cell / 2;
+        g.setColor(Color.BLUE);
+        g.setStroke(new BasicStroke(3f));
+        g.drawLine(cx, cy, cx + world.dir.dc * (cell / 2 - 1), cy + world.dir.dr * (cell / 2 - 1));
+        g.dispose();
+    }
+}
