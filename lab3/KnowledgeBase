@@ -1,0 +1,175 @@
+package lab3;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+
+
+public class KnowledgeBase {
+    private final int n;
+    private final int cells;
+    private final int nv;
+    private final List<int[]> clauses = new ArrayList<>();
+    private final Set<Integer> units = new HashSet<>();
+
+    public KnowledgeBase(int n) {
+        this.n = n;
+        this.cells = n * n;
+        this.nv = 2 * cells;
+    }
+
+    public int p(int r, int c) { return 1 + r * n + c; }
+
+    public int w(int r, int c) { return 1 + cells + r * n + c; }
+
+    public void addUnit(int lit) {
+        if (units.add(lit)) clauses.add(new int[]{lit});
+    }
+
+    public void addClause(int... lits) {
+        if (lits.length == 1) addUnit(lits[0]);
+        else clauses.add(lits);
+    }
+
+
+    public void killWumpus() {
+        for (Iterator<int[]> it = clauses.iterator(); it.hasNext(); ) {
+            for (int lit : it.next()) {
+                if (Math.abs(lit) > cells) {
+                    it.remove();
+                    break;
+                }
+            }
+        }
+        units.removeIf(l -> Math.abs(l) > cells);
+        for (int v = cells + 1; v <= nv; v++) addUnit(-v);
+    }
+
+
+    public boolean[][] mentioned() {
+        boolean[][] m = new boolean[n][n];
+        for (int[] cl : clauses) {
+            for (int lit : cl) {
+                int v = (Math.abs(lit) - 1) % cells;
+                m[v / n][v % n] = true;
+            }
+        }
+        return m;
+    }
+
+    public int size() { return clauses.size(); }
+
+
+    public boolean entails(int lit) {
+        return !satisfiable(-lit);
+    }
+
+    private boolean satisfiable(int assume) {
+        byte[] val = new byte[nv + 1];
+        if (!assign(val, assume)) return false;
+        return solve(val);
+    }
+
+    private boolean assign(byte[] val, int lit) {
+        int v = Math.abs(lit);
+        byte want = (byte) (lit > 0 ? 1 : -1);
+        if (val[v] == want) return true;
+        if (val[v] == -want) return false;
+        val[v] = want;
+        if (lit > 0 && v > cells) {      
+            for (int u = cells + 1; u <= nv; u++) {
+                if (u == v) continue;
+                if (val[u] == 1) return false;
+                val[u] = -1;
+            }
+        }
+        return true;
+    }
+
+    private boolean solve(byte[] val) {
+        boolean again = true;
+        while (again) {
+            again = false;
+
+           
+            boolean changed = true;
+            while (changed) {
+                changed = false;
+                for (int[] cl : clauses) {
+                    boolean sat = false;
+                    int free = 0, lastFree = 0;
+                    for (int lit : cl) {
+                        byte x = val[Math.abs(lit)];
+                        if (x == 0) {
+                            free++;
+                            lastFree = lit;
+                        } else if ((x > 0) == (lit > 0)) {
+                            sat = true;
+                            break;
+                        }
+                    }
+                    if (sat) continue;
+                    if (free == 0) return false;
+                    if (free == 1) {
+                        if (!assign(val, lastFree)) return false;
+                        changed = true;
+                    }
+                }
+            }
+
+
+            boolean[] pos = new boolean[nv + 1], neg = new boolean[nv + 1];
+            for (int[] cl : clauses) {
+                boolean sat = false;
+                for (int lit : cl) {
+                    byte x = val[Math.abs(lit)];
+                    if (x != 0 && (x > 0) == (lit > 0)) {
+                        sat = true;
+                        break;
+                    }
+                }
+                if (sat) continue;
+                for (int lit : cl) {
+                    if (val[Math.abs(lit)] != 0) continue;
+                    if (lit > 0) pos[lit] = true;
+                    else neg[-lit] = true;
+                }
+            }
+            for (int v = 1; v <= nv; v++) {
+                if (val[v] != 0 || pos[v] == neg[v]) continue;
+                if (neg[v]) {
+                    assign(val, -v);
+                    again = true;
+                } else if (v <= cells) {
+                    assign(val, v);
+                    again = true;
+                }
+            }
+        }
+        int branch = 0;
+        for (int[] cl : clauses) {
+            boolean sat = false;
+            int cand = 0;
+            for (int lit : cl) {
+                byte x = val[Math.abs(lit)];
+                if (x == 0) {
+                    if (cand == 0) cand = lit;
+                } else if ((x > 0) == (lit > 0)) {
+                    sat = true;
+                    break;
+                }
+            }
+            if (!sat && cand != 0) {
+                branch = cand;
+                break;
+            }
+        }
+        if (branch == 0) return true;
+        byte[] copy = val.clone();
+        if (assign(copy, branch) && solve(copy)) return true;
+        if (!assign(val, -branch)) return false;
+        return solve(val);
+    }
+}
