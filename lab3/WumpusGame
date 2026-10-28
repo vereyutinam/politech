@@ -1,0 +1,152 @@
+package lab3;
+
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.util.Random;
+
+
+public class WumpusGame extends JFrame {
+    private final Random rnd = new Random();
+    private World world;
+    private Agent agent;
+    private int step;
+    private String status = "";
+
+    private final BoardView board = new BoardView();
+    private final JLabel line1 = infoLabel();
+    private final JLabel line2 = infoLabel();
+    private final JLabel line3 = infoLabel();
+    private final JButton stepBtn = new JButton("Шаг");
+    private final JButton autoBtn = new JButton("Авто");
+    private final JButton newBtn = new JButton("Новый мир");
+    private final JComboBox<Integer> sizeBox = new JComboBox<>(new Integer[]{4, 5, 6, 7, 8, 9, 10, 12, 15, 20});
+    private final JCheckBox knowBox = new JCheckBox("Знания агента", true);
+    private final Timer timer;
+
+    public WumpusGame() {
+        super("Мир Вампуса");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+
+        JPanel header = new JPanel();
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.setBackground(new Color(230, 230, 230));
+        header.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
+        header.add(line1);
+        header.add(line2);
+        header.add(line3);
+
+        JPanel center = new JPanel(new BorderLayout());
+        center.setBackground(new Color(242, 242, 242));
+        center.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        center.add(board, BorderLayout.CENTER);
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 8));
+        buttons.setBackground(new Color(238, 238, 238));
+        sizeBox.setSelectedItem(10);
+        buttons.add(stepBtn);
+        buttons.add(autoBtn);
+        buttons.add(newBtn);
+        buttons.add(new JLabel("  Размер:"));
+        buttons.add(sizeBox);
+        buttons.add(knowBox);
+        for (JButton b : new JButton[]{stepBtn, autoBtn, newBtn}) b.setFont(b.getFont().deriveFont(Font.BOLD));
+
+        add(header, BorderLayout.NORTH);
+        add(center, BorderLayout.CENTER);
+        add(buttons, BorderLayout.SOUTH);
+
+        timer = new Timer(250, e -> doStep());
+        stepBtn.addActionListener(e -> {
+            stopAuto();
+            doStep();
+        });
+        autoBtn.addActionListener(e -> {
+            if (timer.isRunning()) stopAuto();
+            else if (!finished()) {
+                timer.start();
+                autoBtn.setText("Стоп");
+            }
+        });
+        newBtn.addActionListener(e -> newWorld());
+        sizeBox.addActionListener(e -> newWorld());
+        knowBox.addActionListener(e -> board.setShowKnowledge(knowBox.isSelected()));
+
+        newWorld();
+        pack();
+        setMinimumSize(getSize());
+        setLocationRelativeTo(null);
+    }
+
+    private static JLabel infoLabel() {
+        JLabel l = new JLabel(" ");
+        l.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 15));
+        l.setAlignmentX(LEFT_ALIGNMENT);
+        return l;
+    }
+
+    private void newWorld() {
+        stopAuto();
+        int n = (Integer) sizeBox.getSelectedItem();
+        world = new World(n, rnd);
+        agent = new Agent(n, world.hr, world.hc, world.dir);
+        agent.perceive(null, world.getPercept());
+        step = 0;
+        status = "Агент жив и ищет золото";
+        board.setModel(world, agent);
+        updateLabels();
+        pack();
+    }
+
+    private boolean finished() {
+        return !world.alive || world.won || agent.isStuck();
+    }
+
+    private void stopAuto() {
+        timer.stop();
+        autoBtn.setText("Авто");
+    }
+
+    private void doStep() {
+        if (finished()) {
+            stopAuto();
+            return;
+        }
+        Action a = agent.decide();
+        if (a == null) {
+            status = "Агент остановился: " + agent.getThought();
+        } else {
+            world.act(a);
+            step++;
+            agent.perceive(a, world.getPercept());
+            if (!world.alive) status = world.message + " - агент погиб";
+            else if (world.won) status = world.message + " Игра выиграна за " + step + " шагов";
+            else status = "Действие: " + a.title + ". " + agent.getThought();
+        }
+        updateLabels();
+        board.repaint();
+        if (finished()) stopAuto();
+    }
+
+    private void updateLabels() {
+        line1.setText("Шаг: " + step + "   Позиция: " + world.hr + "," + world.hc
+                + "   Направление: " + world.dir + "   Стрела: " + (world.hasArrow ? "есть" : "нет"));
+        line2.setText("Perception: " + world.getPercept());
+        line3.setText(status);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new WumpusGame().setVisible(true));
+    }
+}
