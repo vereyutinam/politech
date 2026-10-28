@@ -1,0 +1,26 @@
+package lab3;
+
+
+public final class Percept {
+    public final boolean stench, breeze, glitter, bump, scream;
+
+    public Percept(boolean stench, boolean breeze, boolean glitter, boolean bump, boolean scream) {
+        this.stench = stench;
+        this.breeze = breeze;
+        this.glitter = glitter;
+        this.bump = bump;
+        this.scream = scream;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        if (stench) sb.append("Stench, ");
+        if (breeze) sb.append("Breeze, ");
+        if (glitter) sb.append("Glitter, ");
+        if (bump) sb.append("Bump, ");
+        if (scream) sb.append("Scream, ");
+        if (sb.length() == 0) return "\u2014\u2014";
+        return sb.substring(0, sb.length() - 2);
+    }
+}
